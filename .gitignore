@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+
+# Virtualenv
+.venv/
+env/
+venv/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+
