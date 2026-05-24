@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: ragflow_web
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app:delegated
+    env_file:
+      - .env
+    restart: unless-stopped
+
+# If you run RAGFlow or a local LLM in separate containers, add services here and
+# connect them via networks. This compose is intentionally minimal for local dev.
+

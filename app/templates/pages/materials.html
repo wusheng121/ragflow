@@ -1,0 +1,67 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="app-layout">
+  {% include "partials/sidebar.html" %}
+  <section class="page-content">
+    <div class="page-header">
+      <h1>资料上传与管理</h1>
+      <p class="muted">上传 PDF / PPTX / Word / txt，系统会自动提取文本并交给 RAGFlow 或本地检索。页面会按当前登录用户过滤资料。</p>
+    </div>
+
+    <section class="card">
+      <div class="card-title">学科（对话）管理</div>
+      <form id="subject-form" class="form-grid">
+        <label class="field"><span>学科名称</span><input name="subject-name" class="input" placeholder="例如：高等数学" required></label>
+        <label class="field"><span>说明（可选）</span><input name="subject-description" class="input" placeholder="例如：2026 春季课程"></label>
+        <button id="subject-submit" type="submit" class="button ghost">新建学科</button>
+      </form>
+      <label class="field" style="margin-top:0.75rem;"><span>当前学科</span><select id="material-subject-select" class="input"></select></label>
+    </section>
+
+    <section class="card">
+      <div class="card-title">上传课件</div>
+      <form id="upload-form" class="form-grid">
+        <label class="field"><span>标题</span><input name="title" class="input" placeholder="例如：经济学第1章" required></label>
+        <label class="field"><span>上传文件（可多选，支持 PDF / PPTX / Word DOCX / TXT / MD）</span><input name="file" type="file" class="input" accept=".pdf,.pptx,.docx,.txt,.md" multiple required></label>
+        <div class="form-grid">
+          <label class="field"><input type="checkbox" id="create-subject-checkbox"> <span>将这些文件作为新学科创建</span></label>
+          <label class="field"><input id="new-subject-name" name="new-subject-name" class="input" placeholder="新学科名称（若选中将创建）"></label>
+        </div>
+        <button id="upload-submit" type="submit" class="button primary">上传并入库</button>
+      </form>
+      <div id="upload-progress-wrap" class="progress-wrap hidden">
+        <div class="progress-track"><div id="upload-progress-bar" class="progress-bar"></div></div>
+        <div id="upload-progress-text" class="small" style="margin-top:0.35rem;">等待上传</div>
+      </div>
+      <div id="auth-message" class="notice hidden" role="status" aria-live="polite"></div>
+      <div class="small" style="margin-top:0.75rem;">支持 PDF / PPTX / DOCX / TXT / MD。</div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">手动录入资料</div>
+      <form id="manual-material-form" class="form-grid">
+        <label class="field"><span>标题</span><input name="manual-title" class="input" placeholder="例如：线性代数第2章" required></label>
+        <label class="field"><span>内容</span><textarea name="manual-content" class="textarea" rows="5" placeholder="可直接粘贴课堂笔记、讲义摘要或重点概念" required></textarea></label>
+        <button id="manual-material-submit" type="submit" class="button ghost">保存文字资料</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="split-row">
+        <div class="card-title" style="margin:0;">资料列表</div>
+        <button type="button" id="refresh-materials" class="button ghost">刷新</button>
+      </div>
+      <div class="split-row" style="margin-top:0.75rem;">
+        <label class="field grow"><span>资料选择</span><select id="material-select" class="input"></select></label>
+      </div>
+      <div id="materials-list" class="stack"></div>
+      <div id="material-detail" class="stack"></div>
+    </section>
+  </section>
+</div>
+<script src="/static/js/page-dashboard.js"></script>
+{% endblock %}
+
+
+

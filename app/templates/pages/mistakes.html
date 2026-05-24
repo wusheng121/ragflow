@@ -1,0 +1,23 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="app-layout">
+  {% include "partials/sidebar.html" %}
+  <section class="page-content">
+    <div class="page-header">
+      <h1>错题本</h1>
+      <p class="muted">自动记录低分回答，并允许你编辑原因、备注与复习状态。</p>
+    </div>
+
+    <section class="card">
+      <div class="split-row">
+        <div class="card-title" style="margin:0;">错题列表</div>
+        <button type="button" id="refresh-mistakes" class="button ghost">刷新错题本</button>
+      </div>
+      <div id="mistakes-list" class="stack"></div>
+    </section>
+  </section>
+</div>
+<script src="/static/js/page-dashboard.js"></script>
+{% endblock %}
+

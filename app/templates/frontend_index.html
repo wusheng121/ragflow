@@ -1,0 +1,35 @@
+{% extends "index.html" %}
+
+{% block head_extra %}
+<meta name="description" content="RAG 复习助手：上传资料、生成知识卡片、练习抽查、管理错题本与历史记录" />
+{% endblock %}
+
+{% block content %}
+<div class="app-layout">
+  {% include "partials/sidebar.html" %}
+  <section class="page-content">
+    <div class="page-header">
+      <h1>学习空间概览</h1>
+      <p class="muted">主页只展示最必要的信息，所有功能请通过左侧“学习空间”进入对应页面。</p>
+    </div>
+
+    <section class="card">
+      <div class="hero-copy" style="padding:0;">
+        <p class="eyebrow">RAG 复习助手</p>
+        <h1 style="font-size:2.2rem;margin-bottom:0.5rem;">从上传课件到错题整理，一站式复习</h1>
+        <p class="hero-text">左侧是学习空间导航，中间区域展示当前页面内容。当前页面不再重复注册、登录或入口说明，直接从侧边栏进入资料、知识卡片、练习、错题本和历史页面即可。</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">使用说明</div>
+      <div class="stack">
+        <div class="item-card"><div class="item-title">1. 上传资料</div><div class="item-text">将课件上传到资料页，系统会自动提取文本并保存到当前账号。</div></div>
+        <div class="item-card"><div class="item-title">2. 生成知识卡片</div><div class="item-text">系统会根据资料抽取关键概念，生成帮助记忆的问答卡片。</div></div>
+        <div class="item-card"><div class="item-title">3. 练习抽查并整理错题</div><div class="item-text">提交答案后，系统会评分、纠错，并把低分内容自动写入错题本。</div></div>
+      </div>
+    </section>
+  </section>
+</div>
+{% endblock %}
+

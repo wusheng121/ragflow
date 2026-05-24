@@ -1,0 +1,14 @@
+<aside class="sidebar card">
+  <div class="sidebar-title">学习空间</div>
+  <div class="small" style="margin-bottom:0.4rem;">当前学科（未选中时默认按文件操作）</div>
+  <div id="sidebar-subject-list" class="subject-card-list"></div>
+  <a class="button ghost subject-create-card" href="/materials#subject-form">＋ 新建学科</a>
+  <a class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}" href="/dashboard">概览</a>
+  <a class="sidebar-link {% if active_page == 'materials' %}active{% endif %}" href="/materials">资料上传</a>
+  <a class="sidebar-link {% if active_page == 'flashcards' %}active{% endif %}" href="/flashcards">知识卡片</a>
+  <a class="sidebar-link {% if active_page == 'practice' %}active{% endif %}" href="/practice">练习抽查</a>
+  <a class="sidebar-link {% if active_page == 'mistakes' %}active{% endif %}" href="/mistakes">错题本</a>
+  <a class="sidebar-link {% if active_page == 'history' %}active{% endif %}" href="/history">练习历史</a>
+  <a class="sidebar-link" href="/login" data-logout-link>退出/切换账号</a>
+</aside>
+

@@ -1,0 +1,31 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="app-layout">
+  {% include "partials/sidebar.html" %}
+  <section class="page-content">
+    <div class="page-header">
+      <h1>知识卡片</h1>
+      <p class="muted">从课件中提取关键术语，生成可以直接抽查的知识卡片。</p>
+    </div>
+
+    <section class="card">
+      <div class="form-grid">
+        <label class="field"><span>学习范围</span><select id="study-scope" class="input"><option value="material">按单个资料</option><option value="subject">按整个学科</option></select></label>
+        <label class="field"><span>学科选择</span><select id="study-subject-select" class="input"></select></label>
+        <label class="field"><span>资料选择</span><select id="material-select" class="input"></select></label>
+        <label class="field"><span>卡片数量</span><input id="flashcard-count" class="input" type="number" min="1" max="20" value="5"></label>
+        <button type="button" id="generate-flashcards" class="button primary">生成知识卡片</button>
+        <button type="button" id="refresh-materials" class="button ghost">刷新资料</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">卡片结果</div>
+      <div id="flashcard-result" class="stack"></div>
+    </section>
+  </section>
+</div>
+<script src="/static/js/page-dashboard.js"></script>
+{% endblock %}
+
