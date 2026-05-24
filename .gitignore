@@ -23,3 +23,5 @@ build/
 # Logs
 *.log
 
+# Env
+.env
