@@ -1,0 +1,52 @@
+:root {
+  /* Core palette */
+  --bg-primary: #060b14;
+  --bg-secondary: #0c1222;
+  --bg-tertiary: #111827;
+  --bg-card: rgba(15, 23, 42, 0.72);
+  --bg-card-hover: rgba(20, 30, 55, 0.85);
+  --bg-glass: rgba(255, 255, 255, 0.03);
+
+  /* Accent — cyber cyan + electric violet */
+  --accent-primary: #00e5ff;
+  --accent-secondary: #7c3aed;
+  --accent-tertiary: #06b6d4;
+  --accent-glow: rgba(0, 229, 255, 0.35);
+  --accent-glow-violet: rgba(124, 58, 237, 0.35);
+
+  /* Semantic */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+
+  /* Text */
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  /* Borders */
+  --border-color: rgba(0, 229, 255, 0.12);
+  --border-glow: rgba(0, 229, 255, 0.4);
+
+  /* Layout */
+  --sidebar-width: 260px;
+  --header-height: 64px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* Typography — Noto Sans SC / system fonts for CJK; Orbitron for logo only */
+  --font-display: 'Exo 2', 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --font-body: 'Exo 2', 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --font-logo: 'Orbitron', 'Exo 2', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+
+  /* Shadows */
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+}
