@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAGFlow &#22797;&#20064;&#21161;&#25163;</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+
+<body>
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon">&#9889;</div>
+          <div>
+            <div class="logo-text">RAGFlow</div>
+            <div class="logo-subtitle">REVIEW ASSISTANT</div>
+          </div>
+        </div>
+      </div>
+
+      <nav class="nav-menu" id="navMenu">
+        <div class="nav-item active" data-page="dashboard">
+          <span class="nav-icon">&#128202;</span>
+          <span>&#20202;&#34920;&#30424;</span>
+        </div>
+        <div class="nav-item" data-page="subjects">
+          <span class="nav-icon">&#128218;</span>
+          <span>&#31185;&#30446;&#31649;&#29702;</span>
+        </div>
+        <div class="nav-item" data-page="knowledge-cards">
+          <span class="nav-icon">&#129504;</span>
+          <span>&#30693;&#35782;&#21345;&#29255;</span>
+        </div>
+        <div class="nav-item" data-page="chat">
+          <span class="nav-icon">&#129302;</span>
+          <span>&#26234;&#33021;&#38382;&#31572;</span>
+        </div>
+        <div class="nav-item" data-page="practice">
+          <span class="nav-icon">&#9998;</span>
+          <span>&#32451;&#20064;&#25277;&#26597;</span>
+        </div>
+        <div class="nav-item" data-page="wrong-book">
+          <span class="nav-icon">&#10060;</span>
+          <span>&#38169;&#39064;&#26412;</span>
+        </div>
+        <div class="nav-item" data-page="history">
+          <span class="nav-icon">&#128203;</span>
+          <span>&#32451;&#20064;&#21382;&#21490;</span>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <header class="top-bar">
+        <div class="top-bar-left" style="display:flex;align-items:center;gap:16px;">
+          <button class="menu-toggle" id="menuToggle" aria-label="&#20999;&#25442;&#33756;&#21333;">&#9776;</button>
+          <h1 class="page-title" id="pageTitle">&#20202;&#34920;&#30424;</h1>
+        </div>
+        <div class="top-bar-actions">
+          <span class="status-badge">
+            <span class="status-dot"></span>
+            <span id="apiStatus">连接中…</span>
+          </span>
+          <div class="account-badge" id="accountBadge">
+            <span class="account-email" id="accountEmail"></span>
+            <button type="button" class="btn btn-sm btn-secondary" id="logoutBtn">切换账号</button>
+          </div>
+        </div>
+      </header>
+
+      <div class="page-content" id="pageContent"></div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">&#26631;&#39064;</h3>
+        <button class="btn btn-icon btn-secondary" id="modalClose" aria-label="&#20851;&#38381;">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+
+</html>

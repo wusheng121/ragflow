@@ -1,0 +1,69 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - RAGFlow 复习助手</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+
+<body class="auth-page">
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="logo-icon auth-logo">⚡</div>
+        <h1 class="auth-title">RAGFlow 复习助手</h1>
+        <p class="auth-subtitle">登录后管理你的科目与知识卡片</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" data-tab="login">登录</button>
+        <button type="button" class="auth-tab" data-tab="register">注册</button>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <div class="form-group">
+          <label class="form-label" for="loginEmail">邮箱</label>
+          <input class="form-input" type="email" id="loginEmail" name="email" required autocomplete="email"
+            placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="loginPassword">密码</label>
+          <input class="form-input" type="password" id="loginPassword" name="password" required
+            autocomplete="current-password" placeholder="请输入密码">
+        </div>
+        <p class="auth-error" id="loginError" hidden></p>
+        <button type="submit" class="btn btn-primary auth-submit" id="loginSubmit">登录</button>
+      </form>
+
+      <form id="registerForm" class="auth-form" hidden>
+        <div class="form-group">
+          <label class="form-label" for="registerEmail">邮箱</label>
+          <input class="form-input" type="email" id="registerEmail" name="email" required autocomplete="email"
+            placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="registerPassword">密码</label>
+          <input class="form-input" type="password" id="registerPassword" name="password" required minlength="6"
+            autocomplete="new-password" placeholder="至少 6 位">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="registerConfirm">确认密码</label>
+          <input class="form-input" type="password" id="registerConfirm" name="confirmPassword" required minlength="6"
+            autocomplete="new-password" placeholder="再次输入密码">
+        </div>
+        <p class="auth-error" id="registerError" hidden></p>
+        <button type="submit" class="btn btn-primary auth-submit" id="registerSubmit">注册并登录</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script type="module" src="js/login.js"></script>
+</body>
+
+</html>
