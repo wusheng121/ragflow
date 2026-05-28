@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     database_url: str = "mysql+pymysql://root:password@127.0.0.1:3306/ragflow_review?charset=utf8mb4"
     upload_dir: str = "uploads"
-    ragflow_api_url: str = "https://a221-240c-c603-1005-a4a9-3c87-6bb4-a3fb-bcd8.ngrok-free.app/"
+    ragflow_api_url: str = "https://c636-240c-c603-1004-f41-dd8c-ed59-6b4e-5191.ngrok-free.app/"
     ragflow_api_key: str = "ragflow-PSWNQln8ui7ktqGJqZCkEROH7PIpuN8MeZK8wvRlKsc"
     ragflow_chat_id: str = ""
     ragflow_parse_timeout: int = 300

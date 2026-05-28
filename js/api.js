@@ -254,82 +254,6 @@ async function extractConceptsWithProgress(subjectId, onProgress, count = 10) {
   return result;
 }
 
-async function generateQuizWithProgress(subjectId, count, onProgress) {
-  const questionCount = Math.max(1, Math.min(50, Number(count) || 5));
-
-  if (useMock) {
-    const steps = [
-      [10, '\u8bfb\u53d6\u77e5\u8bc6\u5361\u7247\u2026'],
-      [28, '\u6784\u5efa\u51fa\u9898\u4e0a\u4e0b\u6587\u2026'],
-      [52, 'AI \u6b63\u5728\u751f\u6210\u9898\u76ee\u2026'],
-      [78, '\u89e3\u6790\u9898\u76ee\u2026'],
-      [92, '\u6574\u7406\u9898\u76ee\u2026'],
-    ];
-    for (const [p, m] of steps) {
-      onProgress?.(p, m);
-      await delay(420);
-    }
-    const questions = generateQuestions(subjectId, questionCount, getStore());
-    if (!questions.length) {
-      throw new Error('\u8be5\u79d1\u76ee\u6682\u65e0\u77e5\u8bc6\u5361\u7247\uff0c\u8bf7\u5148\u4ece\u4e0a\u4f20\u8d44\u6599\u4e2d\u62bd\u53d6\u91cd\u8981\u6982\u5ff5');
-    }
-    onProgress?.(100, `\u5b8c\u6210\uff0c\u5171\u751f\u6210 ${questions.length} \u9053\u9898`);
-    return questions;
-  }
-
-  const res = await fetch(`${API_BASE}/practice/generate/stream`, {
-    method: 'POST',
-    headers: authHeaders({ Accept: 'text/event-stream', 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ subject_id: subjectId, count: questionCount }),
-  });
-
-  if (res.status === 401) {
-    clearAuth();
-    window.location.href = '/';
-    throw new Error('\u767b\u5f55\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55');
-  }
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || err.message || `\u751f\u6210\u9898\u76ee\u5931\u8d25 (${res.status})`);
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let result = null;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-    for (const line of lines) {
-      if (!line.startsWith('data:')) continue;
-      const raw = line.slice(5).trim();
-      if (!raw) continue;
-      let payload;
-      try {
-        payload = JSON.parse(raw);
-      } catch {
-        continue;
-      }
-      if (payload.type === 'progress') {
-        onProgress?.(payload.progress, payload.message);
-      } else if (payload.type === 'done') {
-        onProgress?.(payload.progress, payload.message);
-        result = payload.questions;
-      } else if (payload.type === 'error') {
-        throw new Error(payload.message || '\u751f\u6210\u9898\u76ee\u5931\u8d25');
-      }
-    }
-  }
-
-  if (!result) throw new Error('\u751f\u6210\u9898\u76ee\u672a\u5b8c\u6210\uff0c\u8bf7\u91cd\u8bd5');
-  return result;
-}
-
 async function mockRequest(path, options = {}) {
   await delay(300);
   const store = getStore();
@@ -498,41 +422,28 @@ function mockExtractConcepts(subjectId, store, count = 10) {
 }
 
 function generateQuestions(subjectId, count, store) {
-  const cards = store.knowledgeCards.filter((c) => c.subjectId === subjectId);
+  let cards = store.knowledgeCards.filter((c) => c.subjectId === subjectId);
+  if (!cards.length) {
+    cards = store.knowledgeCards;
+  }
   if (!cards.length) return [];
 
   const selected = shuffleArray(cards).slice(0, Math.min(count, cards.length));
   return selected.map((card) => {
-    const others = cards.filter((c) => c.id !== card.id);
-    const correctRaw = (card.detail || card.summary).split('\u3002')[0].trim();
-    const correct = correctRaw ? `${correctRaw}\u3002` : card.summary;
-
-    const distractors = shuffleArray(others)
-      .slice(0, 3)
-      .map((c) => {
-        const snippet = (c.detail || c.summary).split('\u3002')[0].trim();
-        return snippet ? `\u300c${c.concept}\u300d\u662f\u6307${snippet}\u3002` : `\u300c${c.concept}\u300d\u4e0e\u672c\u9898\u65e0\u5173`;
-      });
-
-    const fallbacks = [
-      `\u300c${card.concept}\u300d\u4e0e\u5b66\u79d1\u6838\u5fc3\u77e5\u8bc6\u65e0\u5173`,
-      `\u300c${card.concept}\u300d\u7684\u5b9a\u4e49\u4e0e\u77e5\u8bc6\u5361\u7247\u63cf\u8ff0\u76f8\u53cd`,
-      `\u300c${card.concept}\u300d\u4ec5\u9002\u7528\u4e8e\u65e5\u5e38\u751f\u6d3b\u573a\u666f`,
-    ];
-    for (const fb of fallbacks) {
-      if (distractors.length >= 3) break;
-      if (!distractors.includes(fb)) distractors.push(fb);
+    const wrongPool = store.knowledgeCards.filter((c) => c.id !== card.id);
+    const distractors = shuffleArray(wrongPool).slice(0, 3).map((c) => c.summary);
+    while (distractors.length < 3) {
+      distractors.push('以上都不正确');
     }
-
-    const options = shuffleArray([correct, ...distractors.slice(0, 3)]);
+    const options = shuffleArray([card.summary, ...distractors.slice(0, 3)]);
     return {
       id: generateId(),
       cardId: card.id,
       subjectId: card.subjectId,
-      question: `\u4ee5\u4e0b\u5173\u4e8e\u300c${card.concept}\u300d\u7684\u8868\u8ff0\uff0c\u54ea\u4e00\u9879\u6700\u51c6\u786e\uff1f`,
+      question: '\u5173\u4e8e\u300c' + card.concept + '\u300d\uff0c\u4ee5\u4e0b\u54ea\u9879\u63cf\u8ff0\u6700\u51c6\u786e\uff1f',
       options,
-      correctIndex: options.indexOf(correct),
-      explanation: card.detail || card.summary,
+      correctIndex: options.indexOf(card.summary),
+      explanation: card.detail,
     };
   });
 }
@@ -613,8 +524,6 @@ export const api = {
     request('/knowledge-cards', { method: 'DELETE', query: `?subject_id=${subjectId}` }),
   generateQuiz: (subjectId, count) =>
     request('/practice/generate', { method: 'POST', body: JSON.stringify({ subject_id: subjectId, count }) }),
-  generateQuizStream: (subjectId, count, onProgress) =>
-    generateQuizWithProgress(subjectId, count, onProgress),
   submitPractice: (data) => request('/practice/submit', { method: 'POST', body: JSON.stringify(data) }),
   getWrongBook: (subjectId) => {
     const q = subjectId ? `?subject_id=${subjectId}` : '';
