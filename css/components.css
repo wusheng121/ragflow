@@ -160,6 +160,11 @@
   50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
 }
 
+.page-root {
+  display: block;
+  width: 100%;
+}
+
 .page-content {
   flex: 1;
   padding: 32px;
@@ -1113,6 +1118,92 @@
 
 .chat-sidebar {
   align-self: start;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-history-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.chat-history-limit {
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.chat-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  max-height: min(360px, calc(100vh - 420px));
+}
+
+.chat-history-list.is-disabled {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.chat-history-empty {
+  padding: 12px 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.chat-history-item {
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.chat-history-item:hover {
+  border-color: var(--border-glow);
+  background: rgba(0, 229, 255, 0.06);
+}
+
+.chat-history-item.active {
+  border-color: var(--accent-primary);
+  background: rgba(0, 229, 255, 0.1);
+}
+
+.chat-history-item-title {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-history-item-meta {
+  margin-top: 4px;
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
 }
 
 .chat-main {
@@ -1188,6 +1279,22 @@
 .chat-typing .chat-bubble-content {
   color: var(--text-muted);
   font-style: italic;
+}
+
+.chat-stream-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent-primary);
+  animation: chat-cursor-blink 1s step-end infinite;
+}
+
+@keyframes chat-cursor-blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 .chat-input-bar {

@@ -254,6 +254,262 @@ async function extractConceptsWithProgress(subjectId, onProgress, count = 10) {
   return result;
 }
 
+const MAX_CHAT_CONVERSATIONS = 10;
+const MAX_TURNS_PER_CONVERSATION = 50;
+
+function mockSubjectScope(subjectId) {
+  return subjectId || null;
+}
+
+function trimChatHistory(messages) {
+  const cleaned = (messages || [])
+    .filter((m) => (m.role === 'user' || m.role === 'assistant') && (m.content || '').trim())
+    .map((m) => ({ role: m.role, content: m.content.trim() }));
+  const maxMessages = MAX_TURNS_PER_CONVERSATION * 2;
+  return cleaned.length <= maxMessages ? cleaned : cleaned.slice(-maxMessages);
+}
+
+function mockCountTurns(messages) {
+  return (messages || []).filter((m) => m.role === 'user' && (m.content || '').trim()).length;
+}
+
+function mockMakeTitle(text) {
+  const t = (text || '').trim().replace(/\n/g, ' ');
+  if (!t) return '新对话';
+  return t.length <= 48 ? t : `${t.slice(0, 48)}…`;
+}
+
+function mockListConversations(store, subjectId) {
+  const scope = mockSubjectScope(subjectId);
+  if (!store.chatConversations) store.chatConversations = [];
+  return store.chatConversations
+    .filter((c) => (c.subjectId || null) === scope)
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, MAX_CHAT_CONVERSATIONS)
+    .map((c) => ({
+      id: c.id,
+      subjectId: c.subjectId,
+      title: c.title,
+      turnCount: mockCountTurns(c.messages),
+      updatedAt: c.updatedAt,
+      createdAt: c.createdAt,
+    }));
+}
+
+function mockPruneConversations(store, subjectId) {
+  const scope = mockSubjectScope(subjectId);
+  const sorted = store.chatConversations
+    .filter((c) => (c.subjectId || null) === scope)
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  const drop = new Set(sorted.slice(MAX_CHAT_CONVERSATIONS).map((c) => c.id));
+  if (drop.size) {
+    store.chatConversations = store.chatConversations.filter((c) => !drop.has(c.id));
+  }
+}
+
+function mockAppendConversationTurn(subjectId, conversationId, userMessage, assistantMessage) {
+  const store = getStore();
+  if (!store.chatConversations) store.chatConversations = [];
+  const scope = mockSubjectScope(subjectId);
+  const now = new Date().toISOString();
+  let conv = conversationId ? store.chatConversations.find((c) => c.id === conversationId) : null;
+  if (!conv) {
+    conv = {
+      id: generateId(),
+      subjectId: scope,
+      title: mockMakeTitle(userMessage),
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    store.chatConversations.push(conv);
+  }
+  const messages = [...(conv.messages || [])];
+  messages.push({ role: 'user', content: userMessage });
+  messages.push({ role: 'assistant', content: assistantMessage });
+  conv.messages = trimChatHistory(messages);
+  conv.updatedAt = now;
+  if (!conv.title || conv.title === '新对话') conv.title = mockMakeTitle(userMessage);
+  mockPruneConversations(store, subjectId);
+  saveStore(store);
+  return {
+    conversationId: conv.id,
+    title: conv.title,
+    history: conv.messages,
+    conversations: mockListConversations(store, subjectId),
+  };
+}
+
+async function sendChatStream(data, onDelta) {
+  const subjectId = data.subjectId || data.subject_id || null;
+  const conversationId = data.conversationId || data.conversation_id || null;
+  const payload = {
+    message: data.message,
+    subject_id: subjectId,
+    subjectId,
+    conversation_id: conversationId,
+    conversationId,
+    history: data.history || [],
+  };
+
+  if (useMock) {
+    const sid = subjectId || null;
+    const prefix = sid ? '\uff08\u57fa\u4e8e\u79d1\u76ee\u77e5\u8bc6\u80cc\u666f\uff09' : '\uff08\u901a\u7528\u6a21\u5f0f\uff09';
+    const reply = `${prefix} \u5173\u4e8e\u300c${data.message}\u300d\uff1a\u8fd9\u662f\u4e00\u4e2a\u5f88\u597d\u7684\u95ee\u9898\u3002\u5728\u672c\u5730\u6a21\u5f0f\u4e0b\u65e0\u6cd5\u8c03\u7528 RAGFlow \u6a21\u578b\uff0c\u8bf7\u786e\u4fdd\u540e\u7aef\u5df2\u914d\u7f6e RAGFLOW_API_URL \u5e76\u8fde\u63a5 API\u3002`;
+    const step = Math.max(1, Math.floor(reply.length / 30));
+    for (let i = step; i < reply.length; i += step) {
+      onDelta?.(reply.slice(0, i));
+      await delay(40);
+    }
+    onDelta?.(reply);
+    const saved = mockAppendConversationTurn(sid, conversationId, data.message, reply);
+    return {
+      reply,
+      history: saved.history,
+      conversationId: saved.conversationId,
+      title: saved.title,
+      conversations: saved.conversations,
+    };
+  }
+
+  const res = await fetch(`${API_BASE}/chat/stream`, {
+    method: 'POST',
+    headers: authHeaders({ Accept: 'text/event-stream', 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+
+  if (res.status === 401) {
+    clearAuth();
+    window.location.href = '/';
+    throw new Error('\u767b\u5f55\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55');
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || err.message || `\u5bf9\u8bdd\u5931\u8d25 (${res.status})`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let reply = '';
+  let savedHistory = null;
+  let conversationIdOut = null;
+  let title = null;
+  let conversations = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const raw = line.slice(5).trim();
+      if (!raw) continue;
+      let event;
+      try {
+        event = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      if (event.type === 'delta') {
+        reply = event.content || '';
+        onDelta?.(reply);
+      } else if (event.type === 'done') {
+        reply = event.reply || reply;
+        onDelta?.(reply);
+        if (Array.isArray(event.history)) savedHistory = event.history;
+        if (event.conversationId) conversationIdOut = event.conversationId;
+        if (event.title) title = event.title;
+        if (Array.isArray(event.conversations)) conversations = event.conversations;
+      } else if (event.type === 'error') {
+        throw new Error(event.message || '\u5bf9\u8bdd\u5931\u8d25');
+      }
+    }
+  }
+
+  if (!reply) throw new Error('\u5bf9\u8bdd\u672a\u5b8c\u6210\uff0c\u8bf7\u91cd\u8bd5');
+  return { reply, history: savedHistory, conversationId: conversationIdOut, title, conversations };
+}
+
+async function generateQuizWithProgress(subjectId, count, onProgress) {
+  const questionCount = Math.max(1, Math.min(50, Number(count) || 5));
+
+  if (useMock) {
+    const steps = [
+      [10, '\u8bfb\u53d6\u77e5\u8bc6\u5361\u7247\u2026'],
+      [28, '\u6784\u5efa\u51fa\u9898\u4e0a\u4e0b\u6587\u2026'],
+      [52, 'AI \u6b63\u5728\u751f\u6210\u9898\u76ee\u2026'],
+      [78, '\u89e3\u6790\u9898\u76ee\u2026'],
+      [92, '\u6574\u7406\u9898\u76ee\u2026'],
+    ];
+    for (const [p, m] of steps) {
+      onProgress?.(p, m);
+      await delay(420);
+    }
+    const questions = generateQuestions(subjectId, questionCount, getStore());
+    if (!questions.length) {
+      throw new Error('\u8be5\u79d1\u76ee\u6682\u65e0\u77e5\u8bc6\u5361\u7247\uff0c\u8bf7\u5148\u4ece\u4e0a\u4f20\u8d44\u6599\u4e2d\u62bd\u53d6\u91cd\u8981\u6982\u5ff5');
+    }
+    onProgress?.(100, `\u5b8c\u6210\uff0c\u5171\u751f\u6210 ${questions.length} \u9053\u9898`);
+    return questions;
+  }
+
+  const res = await fetch(`${API_BASE}/practice/generate/stream`, {
+    method: 'POST',
+    headers: authHeaders({ Accept: 'text/event-stream', 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ subject_id: subjectId, count: questionCount }),
+  });
+
+  if (res.status === 401) {
+    clearAuth();
+    window.location.href = '/';
+    throw new Error('\u767b\u5f55\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55');
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || err.message || `\u751f\u6210\u9898\u76ee\u5931\u8d25 (${res.status})`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let result = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const raw = line.slice(5).trim();
+      if (!raw) continue;
+      let payload;
+      try {
+        payload = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      if (payload.type === 'progress') {
+        onProgress?.(payload.progress, payload.message);
+      } else if (payload.type === 'done') {
+        onProgress?.(payload.progress, payload.message);
+        result = payload.questions;
+      } else if (payload.type === 'error') {
+        throw new Error(payload.message || '\u751f\u6210\u9898\u76ee\u5931\u8d25');
+      }
+    }
+  }
+
+  if (!result) throw new Error('\u751f\u6210\u9898\u76ee\u672a\u5b8c\u6210\uff0c\u8bf7\u91cd\u8bd5');
+  return result;
+}
+
 async function mockRequest(path, options = {}) {
   await delay(300);
   const store = getStore();
@@ -365,13 +621,41 @@ async function mockRequest(path, options = {}) {
   if (path === '/history' && method === 'GET') {
     return store.practiceSessions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
+  if (path === '/chat/conversations' && method === 'GET') {
+    const url = new URL(`http://local${options.query || ''}`);
+    const sid = url.searchParams.get('subject_id') || null;
+    return {
+      conversations: mockListConversations(store, sid),
+      maxList: MAX_CHAT_CONVERSATIONS,
+      maxTurnsPerConversation: MAX_TURNS_PER_CONVERSATION,
+    };
+  }
+  const chatConvMatch = path.match(/^\/chat\/conversations\/([^/]+)$/);
+  if (chatConvMatch && method === 'GET') {
+    const id = chatConvMatch[1];
+    const conv = (store.chatConversations || []).find((c) => c.id === id);
+    if (!conv) throw new Error('对话不存在');
+    return {
+      id: conv.id,
+      subjectId: conv.subjectId,
+      title: conv.title,
+      history: trimChatHistory(conv.messages || []),
+      maxTurns: MAX_TURNS_PER_CONVERSATION,
+    };
+  }
   if (path === '/chat' && method === 'POST') {
     const body = JSON.parse(options.body);
     const msg = body.message;
-    const sid = body.subjectId || body.subject_id;
-    let prefix = sid ? '（基于科目知识背景）' : '（通用模式）';
+    const sid = body.subjectId || body.subject_id || null;
+    const cid = body.conversationId || body.conversation_id || null;
+    const prefix = sid ? '（基于科目知识背景）' : '（通用模式）';
+    const reply = `${prefix} 关于「${msg}」：这是一个很好的问题。在本地模式下无法调用 RAGFlow 模型，请确保后端已配置 RAGFLOW_API_URL 并连接 API。`;
+    const saved = mockAppendConversationTurn(sid, cid, msg, reply);
     return {
-      reply: `${prefix} 关于「${msg}」：这是一个很好的问题。在本地模式下无法调用 RAGFlow 模型，请确保后端已配置 RAGFLOW_API_URL 并连接 API。`,
+      reply,
+      conversationId: saved.conversationId,
+      history: saved.history,
+      title: saved.title,
     };
   }
   if (path === '/stats' && method === 'GET') {
@@ -422,28 +706,41 @@ function mockExtractConcepts(subjectId, store, count = 10) {
 }
 
 function generateQuestions(subjectId, count, store) {
-  let cards = store.knowledgeCards.filter((c) => c.subjectId === subjectId);
-  if (!cards.length) {
-    cards = store.knowledgeCards;
-  }
+  const cards = store.knowledgeCards.filter((c) => c.subjectId === subjectId);
   if (!cards.length) return [];
 
   const selected = shuffleArray(cards).slice(0, Math.min(count, cards.length));
   return selected.map((card) => {
-    const wrongPool = store.knowledgeCards.filter((c) => c.id !== card.id);
-    const distractors = shuffleArray(wrongPool).slice(0, 3).map((c) => c.summary);
-    while (distractors.length < 3) {
-      distractors.push('以上都不正确');
+    const others = cards.filter((c) => c.id !== card.id);
+    const correctRaw = (card.detail || card.summary).split('\u3002')[0].trim();
+    const correct = correctRaw ? `${correctRaw}\u3002` : card.summary;
+
+    const distractors = shuffleArray(others)
+      .slice(0, 3)
+      .map((c) => {
+        const snippet = (c.detail || c.summary).split('\u3002')[0].trim();
+        return snippet ? `\u300c${c.concept}\u300d\u662f\u6307${snippet}\u3002` : `\u300c${c.concept}\u300d\u4e0e\u672c\u9898\u65e0\u5173`;
+      });
+
+    const fallbacks = [
+      `\u300c${card.concept}\u300d\u4e0e\u5b66\u79d1\u6838\u5fc3\u77e5\u8bc6\u65e0\u5173`,
+      `\u300c${card.concept}\u300d\u7684\u5b9a\u4e49\u4e0e\u77e5\u8bc6\u5361\u7247\u63cf\u8ff0\u76f8\u53cd`,
+      `\u300c${card.concept}\u300d\u4ec5\u9002\u7528\u4e8e\u65e5\u5e38\u751f\u6d3b\u573a\u666f`,
+    ];
+    for (const fb of fallbacks) {
+      if (distractors.length >= 3) break;
+      if (!distractors.includes(fb)) distractors.push(fb);
     }
-    const options = shuffleArray([card.summary, ...distractors.slice(0, 3)]);
+
+    const options = shuffleArray([correct, ...distractors.slice(0, 3)]);
     return {
       id: generateId(),
       cardId: card.id,
       subjectId: card.subjectId,
-      question: '\u5173\u4e8e\u300c' + card.concept + '\u300d\uff0c\u4ee5\u4e0b\u54ea\u9879\u63cf\u8ff0\u6700\u51c6\u786e\uff1f',
+      question: `\u4ee5\u4e0b\u5173\u4e8e\u300c${card.concept}\u300d\u7684\u8868\u8ff0\uff0c\u54ea\u4e00\u9879\u6700\u51c6\u786e\uff1f`,
       options,
-      correctIndex: options.indexOf(card.summary),
-      explanation: card.detail,
+      correctIndex: options.indexOf(correct),
+      explanation: card.detail || card.summary,
     };
   });
 }
@@ -524,6 +821,8 @@ export const api = {
     request('/knowledge-cards', { method: 'DELETE', query: `?subject_id=${subjectId}` }),
   generateQuiz: (subjectId, count) =>
     request('/practice/generate', { method: 'POST', body: JSON.stringify({ subject_id: subjectId, count }) }),
+  generateQuizStream: (subjectId, count, onProgress) =>
+    generateQuizWithProgress(subjectId, count, onProgress),
   submitPractice: (data) => request('/practice/submit', { method: 'POST', body: JSON.stringify(data) }),
   getWrongBook: (subjectId) => {
     const q = subjectId ? `?subject_id=${subjectId}` : '';
@@ -532,4 +831,10 @@ export const api = {
   deleteWrongItem: (id) => request(`/wrong-book/${id}`, { method: 'DELETE' }),
   getHistory: () => request('/history'),
   sendChat: (data) => request('/chat', { method: 'POST', body: JSON.stringify(data) }),
+  sendChatStream: (data, onDelta) => sendChatStream(data, onDelta),
+  listChatConversations: (subjectId) => {
+    const q = subjectId ? `?subject_id=${encodeURIComponent(subjectId)}` : '';
+    return request('/chat/conversations', { query: q });
+  },
+  getChatConversation: (conversationId) => request(`/chat/conversations/${conversationId}`),
 };

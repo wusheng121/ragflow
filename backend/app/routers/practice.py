@@ -1,12 +1,16 @@
+import asyncio
+import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import PracticeSession, User, WrongAnswer
 from app.deps import get_current_user, get_db
 from app.schemas import PracticeSubmitOut, PracticeSubmitRequest, PracticeSessionOut, QuizGenerateRequest, QuizQuestionOut
 from app.services.quiz import generate_quiz
+from app.services.ragflow import RagflowError
 from app.utils.id_gen import new_id
 from app.utils.ownership import get_owned_subject
 
@@ -14,13 +18,70 @@ router = APIRouter(prefix="/practice", tags=["practice"])
 
 
 @router.post("/generate", response_model=list[QuizQuestionOut])
-def generate_practice(
+async def generate_practice(
     body: QuizGenerateRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     get_owned_subject(db, body.subject_id, user)
-    return generate_quiz(db, body.subject_id, body.count)
+    return await generate_quiz(db, body.subject_id, body.count)
+
+
+@router.post("/generate/stream")
+async def generate_practice_stream(
+    body: QuizGenerateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    get_owned_subject(db, body.subject_id, user)
+
+    queue: asyncio.Queue[dict] = asyncio.Queue()
+
+    def on_progress(percent: int, message: str) -> None:
+        queue.put_nowait({"type": "progress", "progress": percent, "message": message})
+
+    async def worker() -> None:
+        try:
+            questions = await generate_quiz(
+                db,
+                body.subject_id,
+                body.count,
+                on_progress=on_progress,
+            )
+            if not questions:
+                await queue.put(
+                    {"type": "error", "message": "该科目暂无知识卡片，请先从上传资料中抽取重要概念"}
+                )
+                return
+            await queue.put(
+                {
+                    "type": "done",
+                    "progress": 100,
+                    "message": f"完成，共生成 {len(questions)} 道题",
+                    "questions": [q.model_dump(mode="json", by_alias=True) for q in questions],
+                }
+            )
+        except RagflowError as exc:
+            await queue.put({"type": "error", "message": str(exc)})
+        except Exception as exc:
+            await queue.put({"type": "error", "message": f"生成题目失败: {exc}"})
+
+    async def event_stream():
+        task = asyncio.create_task(worker())
+        try:
+            while True:
+                item = await queue.get()
+                yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+                if item.get("type") in ("done", "error"):
+                    break
+        finally:
+            await task
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/submit", response_model=PracticeSubmitOut)

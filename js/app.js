@@ -1,5 +1,5 @@
 import { api, checkApiHealth, getAuthUser, isLoggedIn, logout } from './api.js';
-import { renderChat } from './modules/chat.js';
+import { renderChat, persistChatState } from './modules/chat.js';
 import { renderDashboard } from './modules/dashboard.js';
 import { renderSubjects } from './modules/subjects.js';
 import { renderKnowledgeCards } from './modules/knowledge-cards.js';
@@ -27,6 +27,10 @@ const pages = {
   history: renderHistory,
 };
 
+/** Pages whose DOM is kept in memory when switching tabs (chat history, quiz progress, etc.) */
+const KEEP_ALIVE_PAGES = new Set(['chat', 'practice']);
+const pageRoots = {};
+
 async function navigate(page) {
   if (!pages[page]) return;
 
@@ -37,7 +41,32 @@ async function navigate(page) {
   document.getElementById('pageTitle').textContent = PAGE_TITLES[page];
 
   const container = document.getElementById('pageContent');
-  await pages[page](container);
+
+  // Always snapshot chat before any route change (avoids empty overwrite on other pages)
+  persistChatState();
+
+  // Detach cached keep-alive roots (preserve their DOM in memory)
+  for (const el of Object.values(pageRoots)) {
+    if (el?.parentNode === container) {
+      el.remove();
+    }
+  }
+
+  if (KEEP_ALIVE_PAGES.has(page)) {
+    // Remove non-cached page markup (e.g. dashboard rendered directly into #pageContent)
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
+    if (!pageRoots[page]) {
+      pageRoots[page] = document.createElement('div');
+      pageRoots[page].className = `page-root page-${page}`;
+    }
+    container.appendChild(pageRoots[page]);
+    await pages[page](pageRoots[page]);
+  } else {
+    container.replaceChildren();
+    await pages[page](container);
+  }
 
   document.getElementById('sidebar').classList.remove('open');
 }

@@ -1,6 +1,6 @@
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 
 import httpx
@@ -225,8 +225,86 @@ class RagflowClient:
     async def chat_messages(self, messages: list[dict]) -> str:
         return await self._call_llm_messages(messages)
 
+    async def chat_messages_stream(self, messages: list[dict]) -> AsyncIterator[str]:
+        async for chunk in self._iter_llm_messages_stream(messages):
+            yield chunk
+
     async def _call_llm(self, prompt: str) -> str:
         return await self._call_llm_messages([{"role": "user", "content": prompt}])
+
+    async def _iter_llm_messages_stream(self, messages: list[dict]) -> AsyncIterator[str]:
+        chat_id = await self.resolve_chat_id()
+        body: dict = {
+            "stream": True,
+            "messages": messages,
+            "model": "model",
+        }
+
+        urls = [
+            f"{self.base_url}/api/v1/openai/{chat_id}/chat/completions",
+            f"{self.base_url}/api/v1/chats_openai/{chat_id}/chat/completions",
+        ]
+
+        last_error: Exception | None = None
+        for url in urls:
+            try:
+                async with httpx.AsyncClient(timeout=180.0) as client:
+                    async with client.stream(
+                        "POST", url, headers=self._headers(), json=body
+                    ) as resp:
+                        if resp.status_code == 404:
+                            continue
+                        resp.raise_for_status()
+
+                        full = ""
+                        buffer = ""
+                        async for chunk in resp.aiter_text():
+                            buffer += chunk
+                            while "\n" in buffer:
+                                line, buffer = buffer.split("\n", 1)
+                                line = line.strip()
+                                if not line.startswith("data:"):
+                                    continue
+                                payload = line[5:].strip()
+                                if payload in {"[DONE]", "true", ""}:
+                                    continue
+                                try:
+                                    obj = json.loads(payload)
+                                except json.JSONDecodeError:
+                                    continue
+                                updated = self._extract_stream_text(obj, full)
+                                if updated != full:
+                                    full = updated
+                                    yield full
+
+                        if not full and buffer.strip():
+                            try:
+                                full = self._parse_llm_response(buffer)
+                                if full:
+                                    yield full
+                            except RagflowError:
+                                pass
+
+                        if full:
+                            return
+            except httpx.HTTPStatusError as exc:
+                last_error = exc
+                if exc.response.status_code == 404:
+                    continue
+                raise RagflowError(
+                    f"RAGFlow 模型调用失败 ({exc.response.status_code}): {exc.response.text[:200]}"
+                ) from exc
+            except RagflowError:
+                raise
+            except Exception as exc:
+                last_error = exc
+                raise RagflowError(f"RAGFlow 模型调用失败: {exc}") from exc
+
+        raise RagflowError(
+            "RAGFlow 对话接口不可用。请确认 RAGFLOW_CHAT_ID 正确，"
+            "或在 RAGFlow 中创建 Chat Assistant。"
+            + (f" 详情: {last_error}" if last_error else "")
+        )
 
     async def _call_llm_messages(self, messages: list[dict]) -> str:
         chat_id = await self.resolve_chat_id()
@@ -284,6 +362,24 @@ class RagflowClient:
             return answer
 
         raise RagflowError("无法解析 LLM 响应")
+
+    @staticmethod
+    def _extract_stream_text(obj: dict, current: str) -> str:
+        choices = obj.get("choices")
+        if isinstance(choices, list) and choices:
+            delta = choices[0].get("delta") or {}
+            piece = delta.get("content")
+            if piece:
+                return current + piece
+            message = choices[0].get("message") or {}
+            if message.get("content"):
+                return message["content"]
+
+        data = obj.get("data")
+        if isinstance(data, dict) and data.get("answer") is not None:
+            return data["answer"]
+
+        return current
 
     @staticmethod
     def _parse_sse_answer(raw: str) -> str:
